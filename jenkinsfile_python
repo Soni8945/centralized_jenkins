@@ -11,7 +11,7 @@ pipeline {
 
     environment {
         IMAGE_NAME = 'python-app' // We'll tag the image with this name
-        SERVICE_NAME = 'python-service'
+        CONTAINER_NAME = 'python-service'
     }
 
     stages {
