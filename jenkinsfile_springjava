@@ -39,18 +39,38 @@ pipeline {
             steps {
                 script {
                     sh """
-                    if [ \$(docker ps -q -f name=${CONTAINER_NAME}) ]; then
-                        echo "Stopping container ${CONTAINER_NAME}..."
-                        docker stop ${CONTAINER_NAME}
-                        docker rm ${CONTAINER_NAME}
+                        CONTAINER_ID=\$(docker ps -aq -f name=^/${CONTAINER_NAME}\$)
+                        
+                        if [ ! -z "\$CONTAINER_ID" ]; then
+                            echo "Stopping and removing existing container: ${CONTAINER_NAME}..."
+                            docker stop \$CONTAINER_ID || true
+                            docker rm \$CONTAINER_ID
+                        fi
+
+                        echo "Starting new container: ${CONTAINER_NAME}..."
                         docker run -d -p 8090:8090 --name spring-service --network host $IMAGE_NAME
-                    else
-                       docker run -d -p 8090:8090 --name spring-service --network host $IMAGE_NAME 
-                    fi
                     """
-                    // sh "docker run -d -p 8090:8090 --name spring-service --network host $IMAGE_NAME" // Runs the image and removes the container after
                 }
             }
+        }
+    }
+    post {
+        success {
+            emailext(
+                from: '	mehul.kartikeyan@jindalsteel.com',  // Set sender email here
+                subject: "SUCCESS: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
+                body: "Build succeeded!\n\nCheck details: ${env.BUILD_URL}",
+                to: "bikash.maharana@jindalsteel.com"
+            )
+        }
+
+        failure {
+            emailext(
+                from: '	mehul.kartikeyan@jindalsteel.com',  // Set sender email here
+                subject: "FAILURE: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
+                body: "Build failed!\n\nCheck details: ${env.BUILD_URL}",
+                to: "bikash.maharana@jindalsteel.com"
+            )
         }
     }
 } 
