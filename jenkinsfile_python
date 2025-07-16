@@ -13,7 +13,7 @@ pipeline {
         IMAGE_NAME = 'python-app' // We'll tag the image with this name
         CONTAINER_NAME = 'python-service'
     }
-
+    
     stages {
 
         // 👇 This stage pulls your Git repo code into the Jenkins workspace
@@ -30,13 +30,14 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    sh "docker build -t $IMAGE_NAME ." // Builds image from current directory
+                    sh "docker build -t $IMAGE_NAME ."// Builds image from current directory
+                    sh "docker inspect --format='{{.Id}}' $IMAGE_NAME"
                 }
             }
         }
 
         // 👇 Run the built Docker container
-        stage('Run Docker Container') {
+        stage('Run Docker Container on test server') {
             steps {
                 script {
                     sh """
@@ -49,7 +50,65 @@ pipeline {
                         fi
 
                         echo "Starting new container: ${CONTAINER_NAME}..."
-                        docker run -d --name ${CONTAINER_NAME} --network host $IMAGE_NAME
+                        docker run -d \
+                            -p 7000:7000 \
+                            --name ${CONTAINER_NAME} \
+                            -e DB_HOST=10.36.0.134 \
+                            -e DB_NAME=postgres \
+                            -e DB_USER=remoteuser1 \
+                            -e DB_PASS=12345678 \
+                            --network host $IMAGE_NAME \
+                            
+                        docker inspect --format='{{.Id}}' $IMAGE_NAME
+
+                    """
+                }
+            }
+        }
+        stage('approval to production'){
+            steps{
+                input message: "looks good in TEST ? Deploy to production?"   
+            }
+        }
+        stage('Copy Docker Image to Production') {
+            steps {
+                sshagent(credentials: ['my-ssh-key-of-prod']) {
+                    sh '''
+                        docker save -o python-app.tar python-app:latest
+                        scp -o StrictHostKeyChecking=no python-app.tar admin@10.36.0.63:/tmp/
+                    '''
+                }
+            }
+        }
+        stage('Deploy to production') {
+            steps {
+                sshagent(credentials: ['my-ssh-key-of-prod']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no admin@10.36.0.63 << 'EOF'
+                        whoami
+                        
+                        docker load -i /tmp/python-app.tar
+                        
+                        CONTAINER_ID=\$(docker ps -aq -f name=^/${CONTAINER_NAME}\$)
+        
+                        if [ ! -z "\$CONTAINER_ID" ]; then
+                            echo "Stopping and removing existing container: ${CONTAINER_NAME}..."
+                            docker stop \$CONTAINER_ID || true
+                            docker rm \$CONTAINER_ID
+                        fi
+        
+                        echo "Starting new container: ${CONTAINER_NAME}..."
+                        docker run -d \
+                            -p 7000:7000 \
+                            --name ${CONTAINER_NAME} \
+                            -e DB_HOST=localhost \
+                            -e DB_NAME=employeedb \
+                            -e DB_USER=remoteuser1 \
+                            -e DB_PASS=12345678 \
+                            --network host ${IMAGE_NAME}
+                            
+                        docker inspect --format='{{.Id}}' $IMAGE_NAME
+EOF
                     """
                 }
             }
@@ -75,4 +134,3 @@ pipeline {
         }
     }
 } 
-
