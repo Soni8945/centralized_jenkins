@@ -20,7 +20,7 @@ pipeline {
         // 👇 This stage pulls your Git repo code into the Jenkins workspace
         stage('Checkout Code') {
             steps {
-                git branch: 'main', url: 'https://github.com/Soni8945/springboot-backend-service-pipeline.git'
+                git branch: 'main', url: 'https://github.com/Soni8945/springboot_backend_service_pipeline_with_testcase.git'
                 // ⬇️ This is where Jenkins pulls from the Git repository (defined in Jenkins Job UI)
                 // checkout scm
             }
