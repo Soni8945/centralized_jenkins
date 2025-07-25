@@ -50,7 +50,7 @@ pipeline {
             }
         }
         // 👇 Run the built Docker container
-        stage('Run Docker Container') {
+        stage('Deploy to Test server') {
             steps {
                 script {
                     sh """
